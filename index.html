@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=TVOJ_MEASUREMENT_ID"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'TVOJ_MEASUREMENT_ID');
+    </script>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>HAJKA: Balkanski Flappy PRO</title>
+    
+    <meta property="og:title" content="HAJKA: Balkanski Flappy">
+    <meta property="og:description" content="Jesi l' polagao preko štele? Obori rekord i ne srljaj k'o june!">
+    <meta property="og:image" content="https://i.imgur.com/8B3996p.png">
+
+    <style>
+        body { margin: 0; background: #000; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; touch-action: none; font-family: 'Comic Sans MS', cursive; }
+        #gameCanvas { border: 5px solid #fff; border-radius: 15px; cursor: pointer; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
+        .ui { position: absolute; color: white; text-align: center; pointer-events: none; text-shadow: 3px 3px #000; z-index: 10; width: 320px; }
+        #upload-box { pointer-events: auto; position: absolute; top: 10px; background: rgba(0,0,0,0.7); padding: 8px; border-radius: 10px; border: 1px solid gold; color: gold; font-size: 10px; z-index: 20; }
+        .share-btn { pointer-events: auto; margin: 5px; padding: 8px 12px; border: none; border-radius: 5px; color: white; font-weight: bold; cursor: pointer; font-size: 12px; display: inline-block; text-decoration: none; }
+        .fb { background: #1877F2; }
+        .wa { background: #25D366; }
+    </style>
+</head>
+<body>
+
+<div id="upload-box">
+    <input type="file" id="upload" accept="image/*">
+    <div>PROMIJENI LIKA (ZA HAJKU)</div>
+</div>
+
+<div class="ui" id="msg-box">
+    <h1 id="status-text">TAPNI ZA START</h1>
+    <div id="score-text" style="font-size: 70px; font-weight: bold;"></div>
+    <div id="high-score-text" style="font-size: 20px; color: gold; margin-top: 10px;"></div>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const statusText = document.getElementById("status-text");
+    const scoreText = document.getElementById("score-text");
+    const highScoreText = document.getElementById("high-score-text");
+
+    canvas.width = 320; canvas.height = 480;
+
+    // --- ZVUKOVI ---
+    const flapSfx = new Audio("https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3");
+    const hitSfx = new Audio("https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3");
+    const powerupSfx = new Audio("https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3");
+
+    // --- ASSETS ---
+    let birdImg = new Image();
+    birdImg.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='18' fill='%23FFD700'/%3E%3Ccircle cx='28' cy='15' r='4' fill='white'/%3E%3Cpath d='M25 25 Q35 30 25 30' fill='orange'/%3E%3C/svg%3E";
+
+    const provale = ["Jesi l' to preko štele?", "Drži se ti lopate!", "Srljaš k'o june!", "Ma bježi, pokvari mi ekran!", "Popij jednu, smiri ruku!", "Đe ćeš glavom kroz cijev?"];
+
+    // --- STANJE IGRE ---
+    let bird, pipes, score, frame, gameState, speed, particles, powerUp, invincibility;
+    let highScore = localStorage.getItem("flappyBalkanHS") || 0;
+    let gameOverTimeout = null;
+
+    function reset() {
+        if(gameOverTimeout) clearTimeout(gameOverTimeout);
+        bird = { x: 50, y: 200, w: 40, h: 40, vel: 0, grav: 0.25, jump: -4.8, rot: 0 };
+        pipes = []; score = 0; frame = 0; speed = 2.5; particles = []; 
+        powerUp = null; invincibility = 0;
+        gameState = "START";
+        statusText.innerHTML = "TAPNI ZA START";
+        scoreText.innerHTML = "";
+        highScoreText.innerHTML = "REKORD: " + highScore;
+        highScoreText.style.display = "block";
+    }
+
+    function createExplosion(x, y, color) {
+        for(let i=0; i<30; i++) {
+            particles.push({
+                x: x, y: y,
+                vx: (Math.random() - 0.5) * 12,
+                vy: (Math.random() - 0.5) * 12,
+                size: Math.random() * 8 + 2,
+                life: 1.0,
+                color: color || `hsl(${Math.random() * 60 + 10}, 100%, 50%)`
+            });
+        }
+    }
+
+    function triggerGameOver() {
+        gameState = "OVER";
+        hitSfx.play();
+        createExplosion(bird.x + 20, bird.y + 20);
+        
+        let poruka = provale[Math.floor(Math.random()*provale.length)];
+        let shareText = `Moj rekord na HAJCI je ${score}! ${poruka} Probaj i ti: ${window.location.href}`;
+        let shareUrl = window.location.href;
+
+        statusText.innerHTML = `
+            <div style="font-size: 20px;">${poruka}</div>
+            <div style="font-size: 40px; margin: 10px 0;">Score: ${score}</div>
+            <div style="margin-top:10px;">
+                <a href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}" target="_blank" class="share-btn fb">Facebook Share</a>
+                <a href="https://wa.me/?text=${encodeURIComponent(shareText)}" target="_blank" class="share-btn wa">WhatsApp Hajka</a>
+            </div>
+        `;
+        highScoreText.style.display = "none";
+
+        if(score > highScore) {
+            highScore = score;
+            localStorage.setItem("flappyBalkanHS", highScore);
+            statusText.innerHTML = "<div style='color:gold; font-size:24px;'>NOVI REKORD!</div>" + statusText.innerHTML;
+            if(typeof gtag === 'function') gtag('event', 'new_high_score', {'score': score});
+        }
+        
+        gameOverTimeout = setTimeout(() => { statusText.innerHTML += "<div style='margin-top:15px; font-size:14px; opacity:0.6;'>KLIKNI ZA PONOVO</div>"; }, 1500);
+    }
+
+    function update() {
+        particles.forEach((p, i) => {
+            p.x += p.vx; p.y += p.vy; p.life -= 0.015;
+            if(p.life <= 0) particles.splice(i, 1);
+        });
+
+        if (gameState !== "PLAYING") return;
+        if(invincibility > 0) invincibility--;
+
+        bird.vel += bird.grav; bird.y += bird.vel;
+        bird.rot = Math.min(Math.PI/4, Math.max(-Math.PI/4, bird.vel * 0.1));
+
+        // Power-up Spawn
+        if (frame % 800 === 0 && score > 3) {
+            powerUp = { x: 320, y: Math.random() * 250 + 100, active: true };
+        }
+        if (powerUp && powerUp.active) {
+            powerUp.x -= speed;
+            if (bird.x < powerUp.x + 30 && bird.x + 40 > powerUp.x && bird.y < powerUp.y + 30 && bird.y + 40 > powerUp.y) {
+                powerUp.active = false; powerupSfx.play();
+                invincibility = 300;
+                createExplosion(bird.x + 20, bird.y + 20, "gold");
+            }
+        }
+
+        if (frame % 100 === 0) {
+            let h = Math.random() * 200 + 50;
+            pipes.push({ x: 320, y: 0, h: h, bottomY: h + 135, passed: false });
+        }
+
+        pipes.forEach((p, i) => {
+            p.x -= speed;
+            if (invincibility <= 0) {
+                if (bird.x + 32 > p.x && bird.x + 8 < p.x + 50 && (bird.y + 8 < p.h || bird.y + 32 > p.bottomY)) triggerGameOver();
+            }
+            if (p.x + 50 < bird.x && !p.passed) { score++; p.passed = true; scoreText.innerHTML = score; speed += 0.05; }
+            if (p.x < -60) pipes.splice(i, 1);
+        });
+
+        if ((bird.y > canvas.height || bird.y < 0) && invincibility <= 0) triggerGameOver();
+        frame++;
+    }
+
+    function draw() {
+        // DINAMIČKA POZADINA (LEVELI)
+        let h1 = 197, h2 = 220;
+        if(score >= 10) { h1 = 20; h2 = 40; } 
+        if(score >= 20) { h1 = 260; h2 = 280; }
+
+        let g = ctx.createLinearGradient(0, 0, 0, 480);
+        g.addColorStop(0, `hsl(${h1}, 70%, 50%)`); g.addColorStop(1, `hsl(${h2}, 100%, 90%)`);
+        ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Power-up (Rakija)
+        if (powerUp && powerUp.active) {
+            ctx.fillStyle = "white"; ctx.fillRect(powerUp.x, powerUp.y, 20, 30);
+            ctx.fillStyle = "red"; ctx.fillRect(powerUp.x + 5, powerUp.y + 5, 10, 10);
+            ctx.strokeStyle = "gold"; ctx.lineWidth = 2; ctx.strokeRect(powerUp.x, powerUp.y, 20, 30);
+        }
+
+        pipes.forEach(p => {
+            ctx.fillStyle = "#2ecc71"; ctx.fillRect(p.x, 0, 50, p.h); ctx.fillRect(p.x, p.bottomY, 50, 480);
+            ctx.strokeStyle = "#1e8449"; ctx.lineWidth = 3; ctx.strokeRect(p.x, 0, 50, p.h); ctx.strokeRect(p.x, p.bottomY, 50, 480);
+        });
+
+        if (gameState !== "OVER" || invincibility > 0) {
+            ctx.save(); ctx.translate(bird.x + 20, bird.y + 20); ctx.rotate(bird.rot);
+            if(invincibility > 0) {
+                ctx.shadowBlur = 25; ctx.shadowColor = "gold"; ctx.strokeStyle = "gold"; ctx.lineWidth = 4; ctx.strokeRect(-22, -22, 44, 44);
+            }
+            ctx.drawImage(birdImg, -20, -20, 40, 40); ctx.restore();
+        }
+
+        particles.forEach(p => { ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); });
+        ctx.globalAlpha = 1;
+    }
+
+    function loop() { update(); draw(); requestAnimationFrame(loop); }
+
+    window.addEventListener("mousedown", () => {
+        if (gameState === "START") { gameState = "PLAYING"; statusText.innerHTML = ""; scoreText.innerHTML = "0"; flapSfx.play(); }
+        else if (gameState === "OVER") { if(statusText.innerHTML.includes("PONOVO")) reset(); }
+        else { bird.vel = bird.jump; flapSfx.currentTime = 0; flapSfx.play(); }
+    });
+
+    document.getElementById("upload").addEventListener("change", (e) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => { birdImg.src = ev.target.result; };
+        reader.readAsDataURL(e.target.files[0]);
+    });
+
+    reset(); loop();
+</script>
+</body>
+</html>
