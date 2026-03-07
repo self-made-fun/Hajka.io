@@ -10,6 +10,9 @@
 
   gtag('config', 'G-VXHK41Q530');
 </script>
+  <!DOCTYPE html>
+<html lang="hr">
+<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>HAJKA PRO - BALKAN EDITION</title>
@@ -18,8 +21,9 @@
         #game-container { position: relative; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
         canvas { width: 100%; height: 100%; object-fit: contain; }
         .ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
-        #msg { color: #ff3e3e; font-size: 35px; text-shadow: 2px 2px #fff; display: none; text-align: center; margin: 20px; z-index: 100; pointer-events: auto; }
-        .btn { pointer-events: auto; background: gold; color: black; padding: 15px 30px; border-radius: 30px; font-weight: bold; border: 3px solid white; font-size: 20px; margin: 10px; z-index: 100; cursor: pointer; }
+        #score-big { font-size: 70px; color: white; text-shadow: 3px 3px #000; z-index: 10; position: absolute; top: 10px; }
+        #msg { color: #ff3e3e; font-size: 30px; font-weight: bold; text-shadow: 2px 2px #fff; display: none; text-align: center; margin: 20px; z-index: 100; pointer-events: auto; }
+        .btn { pointer-events: auto; background: gold; color: black; padding: 15px 30px; border-radius: 30px; font-weight: bold; border: 3px solid white; font-size: 18px; margin: 10px; z-index: 100; cursor: pointer; }
         #upload-box { position: absolute; top: 10px; left: 10px; z-index: 100; pointer-events: auto; background: rgba(0,0,0,0.5); padding: 5px; border-radius: 10px; }
     </style>
 </head>
@@ -31,6 +35,7 @@
         <input type="file" id="upload" accept="image/*" style="display:none">
     </div>
     <div class="ui">
+        <div id="score-big">0</div>
         <div id="msg"></div>
         <div id="buttons" style="display:none; flex-direction: column;">
             <button class="btn" onclick="resetGame()">NOVA IGRA</button>
@@ -45,25 +50,34 @@
     const ctx = canvas.getContext("2d");
     const msgDiv = document.getElementById("msg");
     const btnDiv = document.getElementById("buttons");
+    const scoreDiv = document.getElementById("score-big");
 
+    // ZVUKOVI
     const flapSfx = new Audio("https://actions.google.com/sounds/v1/ui/button_toggle.ogg");
     const boomSfx = new Audio("https://actions.google.com/sounds/v1/explosions/medium_explosion_stomp.ogg");
+    const bgm = new Audio("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3");
+    bgm.loop = true;
 
     canvas.width = 360; canvas.height = 640;
 
-    let bird = { x: 50, y: 300, vel: 0, rot: 0 };
-    let pipes = [], gameState = "PLAYING", frame = 0;
-    const provale = ["Jesi l' to preko štele?", "Srljaš k'o june!", "Drži se drži se!", "Đe ćeš glavom?!", "Obatali ti ovo!", "Da se može kako kroz cijev!", "Letio, letioo sam!"];
+    let bird = { x: 50, y: 300, vel: 0, rot: 0, shield: 0 };
+    let pipes = [], powerup = null, score = 0, gameState = "STOP", frame = 0;
+    let bgColors = ["#4ec0ca", "#ff9a9e", "#a18cd1", "#fad0c4"];
+    let currentColor = bgColors[0];
+    const provale = ["Jesi l' to preko štele?", "Srljaš k'o june!", "Drži se drži se!", "Đe ćeš glavom?!", "Obatali ti ovo!", "Jao pa ima cijev!", "KIKS, nije moguće!"];
 
     let birdImg = new Image();
     birdImg.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='18' fill='%23FFD700'/%3E%3C/svg%3E";
 
     function resetGame() {
-        bird = { x: 50, y: 300, vel: 0, rot: 0 };
-        pipes = []; gameState = "PLAYING"; frame = 0;
+        bird = { x: 50, y: 300, vel: 0, rot: 0, shield: 0 };
+        pipes = []; score = 0; frame = 0; gameState = "PLAYING";
+        powerup = null; currentColor = bgColors[0];
         msgDiv.style.display = "none";
         btnDiv.style.display = "none";
-        loop();
+        scoreDiv.innerHTML = "0";
+        bgm.play();
+        requestAnimationFrame(loop);
     }
 
     function loop() {
@@ -72,49 +86,56 @@
         // Logika
         bird.vel += 0.25; bird.y += bird.vel;
         bird.rot = bird.vel * 0.15;
-        if(frame % 90 === 0) pipes.push({x: 360, h: Math.random()*300+50});
         
-        pipes.forEach(p => {
-            p.x -= 3;
-            if(bird.x+40 > p.x && bird.x < p.x+50 && (bird.y < p.h || bird.y+40 > p.h+160)) {
-                gameState = "OVER"; boomSfx.play();
-                msgDiv.style.display = "block";
-                msgDiv.innerHTML = provale[Math.floor(Math.random()*provale.length)];
-                btnDiv.style.display = "flex";
+        if(frame % 90 === 0) pipes.push({x: 360, h: Math.random()*300+50, passed: false});
+        if(score > 0 && score % 15 === 0 && !powerup && Math.random() < 0.02) powerup = {x: 360, y: Math.random()*400+100};
+
+        if(powerup) {
+            powerup.x -= 3;
+            if(bird.x+40 > powerup.x && bird.x < powerup.x+30 && bird.y+40 > powerup.y && bird.y < powerup.y+30) {
+                bird.shield = 300; powerup = null;
             }
-        });
-        if(bird.y > 640 || bird.y < 0) {
-             gameState = "OVER"; boomSfx.play();
-             msgDiv.style.display = "block";
-             msgDiv.innerHTML = "PAO SI, MAJSTORE!";
-             btnDiv.style.display = "flex";
         }
 
+        pipes.forEach(p => {
+            p.x -= 3;
+            if(bird.x+40 > p.x && bird.x < p.x+50 && (bird.y < p.h || bird.y+40 > p.h+160) && bird.shield <= 0) {
+                gameState = "OVER"; boomSfx.play();
+                msgDiv.innerHTML = provale[Math.floor(Math.random()*provale.length)];
+                msgDiv.style.display = "block";
+                btnDiv.style.display = "flex";
+            }
+            if(p.x+50 < bird.x && !p.passed) { 
+                score++; p.passed = true; scoreDiv.innerHTML = score;
+                if(score % 5 === 0) currentColor = bgColors[(score/5) % bgColors.length];
+            }
+        });
+
+        if(bird.shield > 0) bird.shield--;
+        if(bird.y > 640 || bird.y < 0) { gameState = "OVER"; msgDiv.style.display="block"; btnDiv.style.display="flex"; }
+
         // Crtanje
-        ctx.fillStyle = "#4ec0ca"; ctx.fillRect(0,0,360,640);
+        ctx.fillStyle = currentColor; ctx.fillRect(0,0,360,640);
         pipes.forEach(p => { ctx.fillStyle="#2ecc71"; ctx.fillRect(p.x,0,50,p.h); ctx.fillRect(p.x,p.h+160,50,640); });
+        if(powerup) { ctx.fillStyle="gold"; ctx.fillRect(powerup.x, powerup.y, 30, 30); }
         
-        ctx.save();
-        ctx.translate(bird.x+20, bird.y+20);
-        ctx.rotate(bird.rot);
+        ctx.save(); ctx.translate(bird.x+20, bird.y+20); ctx.rotate(bird.rot);
         ctx.drawImage(birdImg, -20, -20, 40, 40);
+        if(bird.shield > 0) { ctx.strokeStyle="gold"; ctx.lineWidth=5; ctx.strokeRect(-25,-25,50,50); ctx.fillStyle="white"; ctx.fillText("ŠTIT", -15, -30); }
         ctx.restore();
         
         frame++;
         requestAnimationFrame(loop);
     }
 
-    window.addEventListener("pointerdown", () => { 
-        if(gameState === "PLAYING") { bird.vel = -5; flapSfx.play(); } 
-    });
-    
+    window.addEventListener("pointerdown", () => { if(gameState === "PLAYING") { bird.vel = -5; flapSfx.play(); } });
     function shareGame() { navigator.share({title:'HAJKA PRO', url:window.location.href}); }
     document.getElementById("upload").onchange = (e) => { 
         let reader = new FileReader(); reader.onload = (ev) => { birdImg.src = ev.target.result; }; 
         reader.readAsDataURL(e.target.files[0]); 
     };
 
-    loop();
+    resetGame();
 </script>
 </body>
 </html>
