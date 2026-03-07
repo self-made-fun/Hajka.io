@@ -10,9 +10,6 @@
 
   gtag('config', 'G-VXHK41Q530');
 </script>
-  <!DOCTYPE html>
-<html lang="hr">
-<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>HAJKA PRO - BALKAN EDITION</title>
@@ -22,10 +19,9 @@
         #game-container { position: relative; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
         canvas { width: 100%; height: 100%; object-fit: contain; }
         .ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
-        #score-big { font-size: 80px; color: white; text-shadow: 4px 4px #000; z-index: 10; }
-        .btn { pointer-events: auto; background: gold; color: black; padding: 20px 40px; border-radius: 50px; font-weight: bold; border: 4px solid white; font-size: 20px; margin: 10px; z-index: 50; }
-        #msg { color: #ff3e3e; font-size: 40px; text-shadow: 2px 2px #fff; display: none; text-align: center; margin: 20px; z-index: 60; }
-        #upload-box { position: absolute; top: 10px; left: 10px; z-index: 100; pointer-events: auto; background: rgba(0,0,0,0.5); padding: 5px; border-radius: 10px; border: 1px solid gold; }
+        #msg { color: #ff3e3e; font-size: 35px; text-shadow: 2px 2px #fff; display: none; text-align: center; margin: 20px; z-index: 60; pointer-events: auto; }
+        .btn { pointer-events: auto; background: gold; color: black; padding: 15px 30px; border-radius: 30px; font-weight: bold; border: 3px solid white; font-size: 20px; margin: 10px; z-index: 70; }
+        #upload-box { position: absolute; top: 10px; left: 10px; z-index: 100; pointer-events: auto; background: rgba(0,0,0,0.5); padding: 5px; border-radius: 10px; }
     </style>
 </head>
 <body>
@@ -36,7 +32,6 @@
         <input type="file" id="upload" accept="image/*" style="display:none">
     </div>
     <div class="ui">
-        <div id="score-big">0</div>
         <div id="msg"></div>
         <div id="buttons" style="display:none; flex-direction: column;">
             <button class="btn" onclick="location.reload()">NOVA IGRA</button>
@@ -49,46 +44,64 @@
 <script>
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
-    const msgBox = document.getElementById("msg");
-    const provale = ["Jesi l' to preko štele?", "Srljaš k'o june!", "Drži se drži se!", "Đe ćeš glavom?!", "Obatali ti ovo!", "Kao da si s marsa sišao!", "To zeleno izbjegavas!", "Vidiš li cijevi, majstore?"];
+    
+    // ZVUKOVI (Arkadni stil)
+    const flapSfx = new Audio("https://actions.google.com/sounds/v1/ui/button_toggle.ogg");
+    const boomSfx = new Audio("https://actions.google.com/sounds/v1/explosions/medium_explosion_stomp.ogg");
 
     canvas.width = 360; canvas.height = 640;
 
-    let bird = { x: 50, y: 300, vel: 0, shield: 0 };
-    let pipes = [], powerup = null, score = 0, gameState = "PLAYING";
+    let bird = { x: 50, y: 300, vel: 0, rot: 0 };
+    let pipes = [], score = 0, gameState = "PLAYING", frame = 0;
+    const provale = ["Jesi l' to preko štele?", "Srljaš k'o june!", "Drži se mješalice!", "Đe ćeš glavom?!", "Obatali ti ovo!", "Kao da si s brda sišao!"];
+
     let birdImg = new Image();
     birdImg.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='18' fill='%23FFD700'/%3E%3C/svg%3E";
 
     function update() {
         if(gameState !== "PLAYING") return;
         bird.vel += 0.25; bird.y += bird.vel;
+        bird.rot = bird.vel * 0.15; // Naginjanje pri letu
+
+        if(frame % 90 === 0) pipes.push({x: 360, h: Math.random()*300+50});
         
-        // Cijevi i bodovi
-        if(Math.random() < 0.02) pipes.push({x: 360, h: Math.random()*300+50});
         pipes.forEach(p => {
             p.x -= 3;
-            if(bird.x+40 > p.x && bird.x < p.x+50 && (bird.y < p.h || bird.y+40 > p.h+160) && bird.shield <= 0) {
-                gameState = "OVER";
-                msgBox.style.display = "block";
-                msgBox.innerHTML = provale[Math.floor(Math.random()*provale.length)];
+            if(bird.x+40 > p.x && bird.x < p.x+50 && (bird.y < p.h || bird.y+40 > p.h+160)) {
+                gameState = "OVER"; boomSfx.play(); // BOOM zvuk
+                document.getElementById('msg').style.display = "block";
+                document.getElementById('msg').innerHTML = provale[Math.floor(Math.random()*provale.length)];
                 document.getElementById('buttons').style.display = "flex";
             }
         });
         if(bird.y > 640 || bird.y < 0) gameState = "OVER";
+        frame++;
     }
 
     function draw() {
         ctx.fillStyle = "#4ec0ca"; ctx.fillRect(0,0,360,640);
         pipes.forEach(p => { ctx.fillStyle="#2ecc71"; ctx.fillRect(p.x,0,50,p.h); ctx.fillRect(p.x,p.h+160,50,640); });
-        ctx.drawImage(birdImg, bird.x, bird.y, 40, 40);
+        
+        ctx.save();
+        ctx.translate(bird.x+20, bird.y+20);
+        ctx.rotate(bird.rot);
+        ctx.drawImage(birdImg, -20, -20, 40, 40);
+        ctx.restore();
+        
         requestAnimationFrame(() => { update(); draw(); });
     }
 
-    window.addEventListener("pointerdown", () => { if(gameState === "PLAYING") bird.vel = -5; });
-    function shareGame() { navigator.share({title:'HAJKA', url:window.location.href}); }
+    window.addEventListener("pointerdown", () => { 
+        if(gameState === "PLAYING") { bird.vel = -5; flapSfx.play(); } // Lepršanje zvuk
+    });
     
+    function shareGame() { navigator.share({title:'HAJKA PRO', url:window.location.href}); }
+    document.getElementById("upload").onchange = (e) => { 
+        let reader = new FileReader(); reader.onload = (ev) => { birdImg.src = ev.target.result; }; 
+        reader.readAsDataURL(e.target.files[0]); 
+    };
+
     draw();
 </script>
 </body>
 </html>
-
