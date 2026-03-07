@@ -134,7 +134,7 @@
     };
 
     function shareGame() {
-        if(navigator.share) navigator.share({title: 'HAJKA PRO', text: 'Igraj i ti!', url: window.location.href});
+        if(navigator.share) navigator.share({title: 'HAJKA PRO', url: window.location.href});
         else alert("Kopiraj link: " + window.location.href);
     }
 
@@ -142,3 +142,4 @@
 </script>
 </body>
 </html>
+
