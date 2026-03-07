@@ -1,210 +1,127 @@
 <!DOCTYPE html>
 <html lang="hr">
 <head>
-    <script async src="https://www.googletagmanager.com/gtag/js?id=TVOJ_MEASUREMENT_ID"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date()); gtag('config', 'TVOJ_MEASUREMENT_ID');
-    </script>
+   <!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-VXHK41Q530"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
 
+  gtag('config', 'G-VXHK41Q530');
+</script>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>HAJKA PRO</title>
-    
     <style>
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: none; }
-        body { 
-            margin: 0; background: #111; display: flex; align-items: center; justify-content: center; 
-            height: 100vh; width: 100vw; overflow: hidden; position: fixed; font-family: sans-serif;
-        }
+        body { margin: 0; padding: 0; background: #000; overflow: hidden; font-family: sans-serif; touch-action: none; }
+        #game-container { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+        canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
+
+        /* UI Elementi */
+        .ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
         
-        /* Drži igru fiksnom i centriranom */
-        #game-container {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            max-width: 450px; /* Max širina za tablete */
-            max-height: 800px; /* Max visina */
-            aspect-ratio: 9 / 16;
-            background: #000;
-            display: flex; align-items: center; justify-content: center;
-        }
-
-        canvas { 
-            width: 100%; height: 100%; 
-            background: #4ec0ca; 
-            display: block;
-        }
-
-        .ui-overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; z-index: 10; display: flex; flex-direction: column; align-items: center;
-        }
-
-        #score-display { font-size: 70px; font-weight: bold; color: white; text-shadow: 3px 3px #000; margin-top: 40px; }
-        #msg-display { color: white; text-align: center; text-shadow: 2px 2px #000; font-size: 22px; margin-top: 40%; padding: 0 15px; }
-
-        #btn-share {
-            position: absolute; bottom: 20px; right: 20px;
-            padding: 12px 18px; background: gold; color: black;
-            border-radius: 30px; font-weight: bold; pointer-events: auto; 
-            border: 2px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            display: none; text-decoration: none; font-size: 14px; z-index: 20;
-        }
-
-        #upload-box {
-            position: absolute; top: 10px; left: 10px;
-            background: rgba(0,0,0,0.7); padding: 5px; border-radius: 5px;
-            pointer-events: auto; color: white; font-size: 10px; z-index: 30;
-        }
+        #score-big { font-size: 60px; font-weight: bold; color: white; text-shadow: 2px 2px #000; margin-bottom: 20px; }
+        
+        /* Dugmad */
+        .btn { pointer-events: auto; background: gold; color: black; padding: 15px 30px; border-radius: 50px; font-weight: bold; border: none; font-size: 18px; margin: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        #controls { position: absolute; top: 10px; left: 10px; z-index: 100; pointer-events: auto; }
+        
+        /* Poruka */
+        #msg { color: white; font-size: 24px; text-align: center; text-shadow: 2px 2px #000; padding: 20px; display: none; }
     </style>
 </head>
 <body>
 
-    <div id="game-container">
-        <div id="upload-box">
-            <input type="file" id="upload" accept="image/*" style="width: 70px;">
-            <div style="margin-top:2px;">DODAJ LIK</div>
-        </div>
-
-        <div class="ui-overlay">
-            <div id="score-display"></div>
-            <div id="msg-display">TAPNI ZA START</div>
-        </div>
-
-        <div id="btn-share" onclick="nativeShare(event)">SHARE 🚀</div>
-
-        <canvas id="gameCanvas"></canvas>
+<div id="game-container">
+    <div id="controls">
+        <input type="file" id="upload" accept="image/*" style="display:none">
+        <button class="btn" style="padding: 5px 10px; font-size: 12px;" onclick="document.getElementById('upload').click()">UBACI LIK</button>
     </div>
+
+    <div class="ui">
+        <div id="score-big"></div>
+        <div id="msg"></div>
+        <div id="buttons" style="display:none;">
+            <button class="btn" onclick="reset()">NOVA IGRA</button>
+            <button class="btn" onclick="shareGame()">SHARE 🚀</button>
+        </div>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+</div>
 
 <script>
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
-    const msgDisplay = document.getElementById("msg-display");
-    const scoreDisplay = document.getElementById("score-display");
-    const btnShare = document.getElementById("btn-share");
-
-    // FIKSNA REZOLUCIJA ZA LOGIKU
-    canvas.width = 360; canvas.height = 640; 
-
-    const flapSfx = new Audio("https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3");
-    const hitSfx = new Audio("https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3");
+    const msgDiv = document.getElementById("msg");
+    const btnDiv = document.getElementById("buttons");
+    const scoreBig = document.getElementById("score-big");
+    
+    // Postavi rezoluciju
+    canvas.width = 360; canvas.height = 640;
 
     let birdImg = new Image();
     birdImg.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='18' fill='%23FFD700'/%3E%3Ccircle cx='28' cy='15' r='4' fill='white'/%3E%3Cpath d='M25 25 Q35 30 25 30' fill='orange'/%3E%3C/svg%3E";
 
-    const provale = ["Jesi l' to preko štele?", "Srljaš k'o june!", "Drži se mješalice!", "Obatali ti ovo!", "Đe ćeš glavom!", "Vidi ga što srlja!"];
-
-    let bird, pipes, score, frame, gameState, speed, particles;
+    let bird, pipes, score, gameState, speed;
     let highScore = localStorage.getItem("flappyBalkanHS") || 0;
 
     function reset() {
-        bird = { x: 60, y: 280, w: 42, h: 42, vel: 0, grav: 0.25, jump: -5.5, rot: 0 };
-        pipes = []; score = 0; frame = 0; speed = 3.2; particles = [];
-        gameState = "START";
-        msgDisplay.innerHTML = "TAPNI ZA START<br><small style='color:gold'>REKORD: "+highScore+"</small>";
-        scoreDisplay.innerHTML = "";
-        btnShare.style.display = "none";
-    }
-
-    function createExplosion(x, y) {
-        for(let i=0; i<20; i++) {
-            particles.push({
-                x: x, y: y, vx: (Math.random()-0.5)*15, vy: (Math.random()-0.5)*15,
-                size: Math.random()*8+2, life: 1.0, color: `hsl(${Math.random()*60}, 100%, 50%)`
-            });
-        }
-    }
-
-    function update() {
-        particles.forEach((p, i) => {
-            p.x += p.vx; p.y += p.vy; p.life -= 0.03;
-            if(p.life <= 0) particles.splice(i, 1);
-        });
-
-        if (gameState !== "PLAYING") return;
-        
-        bird.vel += bird.grav; bird.y += bird.vel;
-        bird.rot = Math.min(Math.PI/3, Math.max(-Math.PI/4, bird.vel * 0.1));
-
-        if (frame % 90 === 0) {
-            let gap = 160;
-            let h = Math.random() * (canvas.height - gap - 200) + 100;
-            pipes.push({ x: canvas.width, y: 0, h: h, bY: h + gap, p: false });
-        }
-
-        pipes.forEach((p, i) => {
-            p.x -= speed;
-            // Precizniji sudar
-            if (bird.x + 35 > p.x && bird.x + 5 < p.x + 50 && (bird.y + 5 < p.h || bird.y + 35 > p.bY)) endGame();
-            if (p.x + 50 < bird.x && !p.p) { score++; p.p = true; scoreDisplay.innerHTML = score; speed += 0.03; }
-            if (p.x < -60) pipes.splice(i, 1);
-        });
-
-        if (bird.y > canvas.height || bird.y < 0) endGame();
-        frame++;
+        bird = { x: 50, y: 300, vel: 0, grav: 0.25, jump: -5 };
+        pipes = []; score = 0; speed = 3; gameState = "PLAYING";
+        msgDiv.style.display = "none";
+        btnDiv.style.display = "none";
+        scoreBig.innerHTML = "0";
     }
 
     function endGame() {
-        gameState = "OVER"; hitSfx.play();
-        createExplosion(bird.x + 20, bird.y + 20);
-        let msg = provale[Math.floor(Math.random()*provale.length)];
-        msgDisplay.innerHTML = "<span style='color:red'>"+msg+"</span><br>SCORE: " + score;
-        if(score > highScore) {
-            highScore = score; localStorage.setItem("flappyBalkanHS", highScore);
-            msgDisplay.innerHTML = "<span style='color:gold'>NOVI REKORD!</span><br>" + msgDisplay.innerHTML;
-        }
-        btnShare.style.display = "block";
+        gameState = "OVER";
+        msgDiv.style.display = "block";
+        btnDiv.style.display = "block";
+        msgDiv.innerHTML = "KRAJ! Tvoj score: " + score;
+        if(score > highScore) { highScore = score; localStorage.setItem("flappyBalkanHS", highScore); }
+    }
+
+    function update() {
+        if(gameState !== "PLAYING") return;
+        bird.vel += bird.grav; bird.y += bird.vel;
+
+        if(frame % 90 === 0) pipes.push({x: 360, h: Math.random()*300+50, passed: false});
+
+        pipes.forEach((p, i) => {
+            p.x -= speed;
+            if(bird.x+30 > p.x && bird.x < p.x+50 && (bird.y < p.h || bird.y+30 > p.h+150)) endGame();
+            if(p.x+50 < bird.x && !p.passed) { score++; p.passed = true; scoreBig.innerHTML = score; }
+        });
+        if(bird.y > 640 || bird.y < 0) endGame();
+        frame++;
     }
 
     function draw() {
-        let h1 = 197; if(score >= 10) h1 = 20; if(score >= 20) h1 = 260;
-        let g = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        g.addColorStop(0, `hsl(${h1}, 75%, 50%)`); g.addColorStop(1, "#fff");
-        ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
-
+        ctx.fillStyle = "#4ec0ca"; ctx.fillRect(0,0,360,640);
         pipes.forEach(p => {
-            ctx.fillStyle = "#2ecc71"; ctx.fillRect(p.x, 0, 50, p.h); ctx.fillRect(p.x, p.bY, 50, canvas.height);
-            ctx.strokeStyle = "#1e8449"; ctx.lineWidth = 3; ctx.strokeRect(p.x, -2, 50, p.h+2); ctx.strokeRect(p.x, p.bY, 50, canvas.height);
+            ctx.fillStyle = "green"; 
+            ctx.fillRect(p.x, 0, 50, p.h);
+            ctx.fillRect(p.x, p.h+150, 50, 640);
         });
-
-        ctx.save();
-        ctx.translate(bird.x + 21, bird.y + 21); ctx.rotate(bird.rot);
-        ctx.drawImage(birdImg, -21, -21, 42, 42);
-        ctx.restore();
-
-        particles.forEach(p => { ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); });
-        ctx.globalAlpha = 1;
+        ctx.drawImage(birdImg, bird.x, bird.y, 40, 40);
+        requestAnimationFrame(() => { update(); draw(); });
     }
 
-    function loop() { update(); draw(); requestAnimationFrame(loop); }
-
-    function handleInput(e) {
-        if (e.target.closest('#upload-box') || e.target.closest('#btn-share')) return;
-        if (gameState === "START") { gameState = "PLAYING"; msgDisplay.innerHTML = ""; scoreDisplay.innerHTML = "0"; }
-        else if (gameState === "OVER") reset();
-        else { bird.vel = bird.jump; flapSfx.currentTime = 0; flapSfx.play(); }
-    }
-
-    async function nativeShare(e) {
-        e.stopPropagation();
-        try {
-            if (navigator.share) {
-                await navigator.share({ title: 'HAJKA PRO', text: `Moj rekord je ${score}!`, url: window.location.href });
-            } else { alert("Link: " + window.location.href); }
-        } catch (err) {}
-    }
-
-    window.addEventListener("touchstart", (e) => { handleInput(e); e.preventDefault(); }, { passive: false });
-    window.addEventListener("mousedown", handleInput);
-    document.getElementById("upload").addEventListener("change", (e) => {
-        const reader = new FileReader();
+    // Inputi
+    window.addEventListener("touchstart", () => { if(gameState==="PLAYING") bird.vel = bird.jump; });
+    document.getElementById("upload").onchange = function(e) {
+        let reader = new FileReader();
         reader.onload = (ev) => { birdImg.src = ev.target.result; };
         reader.readAsDataURL(e.target.files[0]);
-    });
+    };
 
-    reset(); loop();
+    function shareGame() {
+        if(navigator.share) navigator.share({title: 'HAJKA', url: window.location.href});
+    }
+
+    let frame = 0;
+    reset(); draw();
 </script>
 </body>
 </html>
